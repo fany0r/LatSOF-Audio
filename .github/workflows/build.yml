@@ -1,0 +1,43 @@
+name: Build LatSOFAudio.kext  
+  
+on:   
+  workflow_dispatch:  
+
+jobs:  
+  build:  
+    runs-on: macos-14
+    steps:  
+      - uses: actions/checkout@v4  
+  
+      - name: Install Command Line Tools deps  
+        run: |  
+          clang --version  
+          ls /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/Kernel.framework/Headers  
+  
+      - name: Fetch SOF firmware (sof-cml.ri)  
+        run: |  
+          mkdir -p kext/LatSOFAudio/Firmware  
+          curl -L -o sof-bin.tar.gz https://github.com/thesofproject/sof-bin/releases/download/v2026.09.2/sof-bin-2026.09.2.tar.gz 
+          tar -xzf sof-bin.tar.gz   
+          
+          TARGET_FW=$(find . -name "sof-cnl.ri" | grep "intel-signed" | head -n 1)
+          if [ -z "$TARGET_FW" ]; then
+            echo "Error: sof-cnl.ri not found in downloaded archive!"
+            exit 1
+          fi
+          echo "Found firmware at: $TARGET_FW"
+          cp "$TARGET_FW" kext/LatSOFAudio/Firmware/sof-cml.ri  
+          ls -lL kext/LatSOFAudio/Firmware/sof-cml.ri 
+  
+      - name: Build kext  
+        run: make -C kext  
+  
+      - name: Verify artifacts  
+        run: |  
+          file kext/LatSOFAudio.kext/Contents/MacOS/LatSOFAudio  
+          lipo -info kext/LatSOFAudio.kext/Contents/MacOS/LatSOFAudio
+  
+      - uses: actions/upload-artifact@v4  
+        with:  
+          name: LatSOFAudio 
+          path: kext/LatSOFAudio.kext
